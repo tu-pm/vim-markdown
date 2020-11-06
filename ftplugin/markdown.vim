@@ -865,6 +865,48 @@ function! s:MarkdownClearSyntaxVariables()
     endif
 endfunction
 
+function! g:MarkdownLocalizeImages()
+    let pattern = '!\[.*\](\(.*\))'
+    let images_dir = './images/'
+    execute system('mkdir -p ' . images_dir)
+
+    for i in range(0, line('$'))
+        let line = getline(i)
+        let matches = matchlist(line, pattern)
+        if len(matches) > 1
+            let uri = matches[1]
+            if IsRemote(uri)
+                let fname = system('head /dev/urandom | tr -dc A-Za-z0-9 | head -c 15 ; echo ""')[:-2]
+                let fname = images_dir . fname . ImageExt(uri)
+                execute system('curl -ks "' . uri . '" -o ' . fname)
+            else
+                let fname = images_dir . system('basename ' . uri)[:-2]
+                execute system('cp -n ' . uri . ' ' . fname)
+            endif
+            let line = substitute(line, uri, fname, '')
+            call setline(i, line)
+        endif
+    endfor
+endfunction
+
+function! IsRemote(uri)
+    for prefix in ['http://', 'https://', 'ftp://', 'sftp://']
+        if stridx(a:uri, prefix) == 0
+            return 1
+        endif
+    endfor
+    return 0
+endfunction
+
+function! ImageExt(uri)
+    for suffix in ['.jpeg', '.jpg', '.png', '.svg']
+        if len(matchstr(a:uri, suffix))
+            return suffix
+        endif
+    endfor
+    return ''
+endfunction
+
 augroup Mkd
     " These autocmd calling s:MarkdownRefreshSyntax need to be kept in sync with
     " the autocmds calling s:MarkdownSetupFolding in after/ftplugin/markdown.vim.
